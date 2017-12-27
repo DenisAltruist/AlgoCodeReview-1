@@ -1,17 +1,22 @@
 #include <iostream>
+#include <utility>
 
+
+template <typename T> class List;
+
+template <typename T>
 class ListElement {
- friend class List;
+ friend class List<T>;
  private:
-     int key;
+     T key;
      ListElement *ptr;
 
  public:
      ListElement() : ptr(nullptr) {};
 
-     ListElement(int value): key(value), ptr(nullptr) {};
+     ListElement(T value): key(value), ptr(nullptr) {};
 
-     void SetKey(int value) {
+     void SetKey(T value) {
         key = value;
      }
 
@@ -19,31 +24,32 @@ class ListElement {
         return ptr;
      }
 
-     int GetKey() const {
+     T GetKey() const {
         return key;
      }
 };
 
+template <typename T>
 class List {
- friend class MergeSorter;
+
  private:
-    ListElement *first, *last;
+    ListElement<T> *first, *last;
     bool isEmpty;
 
  public:
      List(): first(nullptr), last(nullptr), isEmpty(true) {};
 
-    ListElement* GetFirst() const {
+    ListElement<T>* GetFirst() const {
         return first;
     }
 
-    ListElement* GetLast() const {
+    ListElement<T>* GetLast() const {
         return last;
     }
 
     void SetFree() {
         while (first != nullptr) {
-            ListElement* temp = first;
+            ListElement<T>* temp = first;
             first = first->ptr;
             delete temp;
         }
@@ -51,44 +57,43 @@ class List {
         isEmpty = true;
     }
 
-    void Copy(ListElement* newFirst, ListElement* newLast) {
+    void Copy(ListElement<T>* newFirst, ListElement<T>* newLast) {
         SetFree();
-        ListElement* currPtr = newFirst;
-        while (1) {
-            Push(currPtr->GetKey());
-            if (currPtr == newLast) {
-                break;
-            }
-            currPtr = currPtr->GetNext();
+        while (newFirst != newLast) {
+            Push(newFirst->GetKey());
+            newFirst = newFirst.GetNext();
         }
     }
 
-    void Push(int value) {
+    void Push(T value) {
         if (isEmpty) {
-            first = new ListElement(value);
+            first = new ListElement<T>(value);
             last = first;
             isEmpty = false;
         } else {
-            last->ptr = new ListElement(value);
+            last->ptr = new ListElement<T>(value);
             last = last->ptr;
         }
     }
 
-    void operator= (const List& rhs) {
+    List& operator= (const List& rhs) {
         SetFree();
-        ListElement* p = rhs.GetFirst();
+        ListElement<T>* p = rhs.GetFirst();
         while (p != nullptr) {
             Push(p->key);
             p = p->ptr;
         }
+        return *this;
     }
+
     ~List() {
         SetFree();
     }
 };
 
-std::ostream& operator<< (std::ostream& out, const List& A) {
-    ListElement* ptr = A.GetFirst();
+template <typename T>
+std::ostream& operator<< (std::ostream& out, const List<T>& A) {
+    ListElement<T>* ptr = A.GetFirst();
     while (ptr != nullptr) {
         out << ptr->GetKey() << " ";
         ptr = ptr->GetNext();
@@ -96,58 +101,66 @@ std::ostream& operator<< (std::ostream& out, const List& A) {
     return out;
 }
 
+template <typename T>
 class MergeSorter {
  private:
-    List T;
+    List<T> HelpingList;
 
  public:
-    void Sort(ListElement* lp, ListElement* rp, int length) {
+     void Merge(ListElement<T>* lp, ListElement<T>* mp, ListElement<T>* rp) {
+        ListElement<T>* ip = lp;
+        ListElement<T>* jp = mp;
+        ListElement<T>* rightBorder = rp->GetNext();
+        ListElement<T>* midBorder = mp;
+        HelpingList.SetFree();
+        while (ip != midBorder || jp != rightBorder) {
+            if (jp == rightBorder || (ip != midBorder && ip->GetKey() < jp->GetKey())) {
+                HelpingList.Push(ip->GetKey());
+                ip = ip->GetNext();
+            } else {
+                HelpingList.Push(jp->GetKey());
+                jp = jp->GetNext();
+            }
+        }
+        ip = HelpingList.GetFirst();
+        jp = lp;
+        while (ip != nullptr) {
+            jp->SetKey(ip->GetKey());
+            jp = jp->GetNext();
+            ip = ip->GetNext();
+        }
+     }
+
+    ListElement<T>* Split(ListElement<T>* lp, ListElement<T>* rp, int length) {
+        ListElement<T>* mp = lp;
+        for (int i = 0; i < (length >> 1) - 1; ++i) {
+            mp = mp->GetNext();
+        }
+        return mp;
+    }
+
+    void Sort(ListElement<T>* lp, ListElement<T>* rp, int length) {
         if (length == 1) {
             return;
         }
-        int lengthOfTheLeftPart = (length >> 1);
-        ListElement* mp = lp;
-        for (int i = 0; i < lengthOfTheLeftPart - 1; ++i) {
-            mp = mp->GetNext();
-        }
-        Sort(lp, mp, lengthOfTheLeftPart);
+        ListElement<T>* mp = Split(lp, rp, length);
+        Sort(lp, mp, (length >> 1));
         mp = mp->GetNext();
-        Sort(mp, rp, length - lengthOfTheLeftPart);
-        T.SetFree();
-        ListElement* ip = lp;
-        ListElement* jp = mp;
-        int cntOfStepsIp = lengthOfTheLeftPart;
-        int cntOfStepsJp = length - cntOfStepsIp;
-        while (cntOfStepsIp != 0 || cntOfStepsJp != 0) {
-            if ((ip != mp) && ((cntOfStepsJp == 0) || (ip->GetKey() < jp->GetKey()))) {
-                T.Push(ip->GetKey());
-                ip = ip->GetNext();
-                --cntOfStepsIp;
-            } else {
-                T.Push(jp->GetKey());
-                jp = jp->GetNext();
-                --cntOfStepsJp;
-            }
-        }
-        ListElement* ptr = T.GetFirst();
-        while (ptr != nullptr) {
-            lp->SetKey(ptr->GetKey());
-            lp = lp->GetNext();
-            ptr = ptr->GetNext();
-        }
+        Sort(mp, rp, length - (length >> 1));
+        Merge(lp, mp, rp);
     }
 };
 
 int main() {
     int n;
     std::cin >> n;
-    List A;
+    List<int> A;
     for (int i = 0; i < n; ++i) {
         int x;
         std::cin >> x;
         A.Push(x);
     }
-    MergeSorter MS;
+    MergeSorter<int> MS;
     MS.Sort(A.GetFirst(), A.GetLast(), n);
     std::cout << A << "\n";
     return 0;
